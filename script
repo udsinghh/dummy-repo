@@ -1,88 +1,82 @@
 import os
-import requests
 import base64
-# Environment variables
-token = os.getenv("REPO_TOKEN")
-username = os.getenv("REPO_USER")
-repo_name = "kpmg_nuxus-kpmg-sapi"
-branch_name = "feature/CICDAutomation"
-default_branch = "main"  # Change to 'master' if needed
-headers = {
-   "Authorization": f"Bearer {token}",
-   "Accept": "application/vnd.github+json"
+import requests
+ 
+#GitHub credentials and configuration
+GITHUB_TOKEN = os.getenv("REPO_TOKEN")          # Updated token environment variable
+GITHUB_USERNAME = os.getenv("REPO_USER")        # Updated username environment variable
+REPO_NAME = "kpmg-us-nexus-dummy-sapi"
+FEATURE_BRANCH = "Feature/CICDAutomation"
+ 
+HEADERS = {
+    "Authorization": f"token {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github.v3+json"
 }
+ 
 # Create repository
-print(f"Creating repository: {repo_name}")
-repo_url = "https://api.github.com/user/repos"
-repo_data = {
-   "name": repo_name,
-   "private": True,
-   "auto_init": True
-}
-response = requests.post(repo_url, headers=headers, json=repo_data)
-if response.status_code == 201:
-   print(f"Repository '{repo_name}' created successfully.")
-else:
-   print(f"Failed to create repository: {response.status_code}")
-   print(response.json())
-   exit(1)
-repo_api_url = f"https://api.github.com/repos/{username}/{repo_name}"  
-
-# Step 2: Add README.md
-print("Adding README.md to repository...")
-readme_url = f"{repo_api_url}/contents/README.md"
-readme_content = base64.b64encode("Hello Devops Team==".encode()).decode()
-readme_data = {
-   "message": "Initial commit",
-   "content": readme_content,
-   "branch": actual_default_branch
-}
-readme_response = requests.put(readme_url, headers=headers, json=readme_data)
-if readme_response.status_code in [201, 200]:
-   print("README.md added successfully.")
-else:
-   print(f"Failed to add README.md: {readme_response.status_code}")
-   print(readme_response.json())
-   exit(1)
-# Create feature branch from default branch
-print(f"Creating feature branch: {branch_name}")
-main_ref_url = f"{repo_api_url}/git/ref/heads/{default_branch}"
-main_ref_response = requests.get(main_ref_url, headers=headers)
-if main_ref_response.status_code != 200:
-   print(f"Failed to get default branch reference: {main_ref_response.status_code}")
-   print(main_ref_response.json())
-   exit(1)
-main_sha = main_ref_response.json()["object"]["sha"]
-branch_data = {
-   "ref": f"refs/heads/{branch_name}",
-   "sha": main_sha
-}
-branch_response = requests.post(f"{repo_api_url}/git/refs", headers=headers, json=branch_data)
-if branch_response.status_code == 201:
-   print(f"Branch '{branch_name}' created successfully.")
-else:
-   print(f"Failed to create branch: {branch_response.status_code}")
-   print(branch_response.json())
-   exit(1)
-# Enable branch protection on feature branch
-print(f"Enabling branch protection for: {branch_name}")
-protection_url = f"{repo_api_url}/branches/{branch_name}/protection"
-protection_headers = headers.copy()
-protection_headers["Accept"] = "application/vnd.github+json"
-protection_rules = {
-   "required_status_checks": {
-       "strict": True,
-       "contexts": []
-   },
-   "enforce_admins": True,
-   "required_pull_request_reviews": {
-       "required_approving_review_count": 1
-   },
-   "restrictions": None
-}
-protection_response = requests.put(protection_url, headers=protection_headers, json=protection_rules)
-if protection_response.status_code == 200:
-   print(f"Branch protection enabled for '{branch_name}'.")
-else:
-   print(f"Failed to enable branch protection: {protection_response.status_code}")
-   print(protection_response.json())
+def create_repository():
+    url = "https://api.github.com/user/repos"
+    data = {
+        "name": REPO_NAME,
+        "private": False,
+        "auto_init": False
+    }
+    response = requests.post(url, json=data, headers=HEADERS)
+    response.raise_for_status()
+    print("Repository created successfully.")
+#add Readme file
+def add_readme():
+    url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{REPO_NAME}/contents/README.md"
+    content = base64.b64encode(b"# Hello Devsecops team welcome to the repository").decode("utf-8")
+    data = {
+        "message": "Add README.md",
+        "content": content,
+        "branch": "main"
+    }
+    response = requests.put(url, json=data, headers=HEADERS)
+    response.raise_for_status()
+    print("README.md added successfully.")
+ 
+def get_main_branch_sha():
+    url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{REPO_NAME}/git/ref/heads/main"
+    response = requests.get(url, headers=HEADERS)
+    response.raise_for_status()
+    return response.json()["object"]["sha"]
+#Create feature branch  
+def create_feature_branch():
+    sha = get_main_branch_sha()
+    url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{REPO_NAME}/git/refs"
+    data = {
+        "ref": f"refs/heads/{FEATURE_BRANCH}",
+        "sha": sha
+    }
+    response = requests.post(url, json=data, headers=HEADERS)
+    response.raise_for_status()
+    print(f"Feature branch '{FEATURE_BRANCH}' created successfully.")
+#enable branch protection rule
+def enable_branch_protection(branch):
+    url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{REPO_NAME}/branches/{branch}/protection"
+    data = {
+        "required_status_checks": {
+            "strict": True,
+            "contexts": []
+        },
+        "enforce_admins": True,
+        "required_pull_request_reviews": {
+            "required_approving_review_count": 1
+        },
+        "restrictions": None
+    }
+    response = requests.put(url, json=data, headers=HEADERS)
+    response.raise_for_status()
+    print(f"Branch protection enabled for '{branch}'.")
+ 
+def main():
+    create_repository()
+    add_readme()
+    create_feature_branch()
+    enable_branch_protection("main")
+    enable_branch_protection(FEATURE_BRANCH)
+ 
+if __name__ == "__main__":
+    main()
